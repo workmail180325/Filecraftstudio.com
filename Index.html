@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileCraft Studio Pro | Base v1.2</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1; --bg: #ffffff; --sidebar-bg: #f8fafc;
+            --text: #0f172a; --text-dim: #94a3b8; --border: #e2e8f0;
+            --preview-bg: #f1f5f9; --card: #ffffff; --green-glow: #22c55e;
+            --toast-bg: rgba(255, 255, 255, 0.98);
+            --active-green: #dcfce7; --active-green-text: #166534;
+            --brand-gradient: linear-gradient(90deg, #6366f1, #ec4899, #f59e0b, #6366f1);
+        }
+        [data-theme="dark"] {
+            --bg: #0f172a; --sidebar-bg: #020617; --text: #f8fafc;
+            --text-dim: #64748b; --border: #1e293b; --preview-bg: #020617;
+            --card: #1e293b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Meta Bar */
+        .meta-bar { height: 45px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .brand-box { font-size: 1.1rem; font-weight: 800; background: var(--brand-gradient); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shine 4s linear infinite; }
+        @keyframes shine { to { background-position: 200% center; } }
+
+        .main-layout { display: flex; height: calc(100vh - 45px); overflow: hidden; position: relative; }
+        
+        /* Sidebar */
+        .sidebar { width: 350px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; gap: 12px; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; z-index: 10; }
+        .sidebar.collapsed { width: 0; padding: 0; border: none; margin-left: -10px; opacity: 0; pointer-events: none; }
+        .collapse-trigger { position: absolute; left: 350px; top: 50%; transform: translateY(-50%); z-index: 100; background: var(--card); border: 1px solid var(--border); padding: 12px 6px; cursor: pointer; border-radius: 0 8px 8px 0; display: none; }
+
+        /* MULTICOLOUR ROTATING BORDER BOX */
+        .drop-zone-wrapper { position: relative; padding: 3px; border-radius: 14px; background: var(--brand-gradient); background-size: 300% 300%; animation: borderRotate 4s linear infinite; cursor: pointer; transition: transform 0.2s; }
+        .drop-zone { background: var(--card); border-radius: 11px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 1; border: 1px solid transparent; }
+        .drop-zone-wrapper:hover, .drop-zone-wrapper.drag-active { transform: scale(1.02); animation-duration: 1.5s; box-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+
+        @keyframes borderRotate { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* Sidebar Elements */
+        .file-card { background: var(--card); border: 1px solid var(--border); padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; font-size: 0.75rem; }
+        .file-name { color: var(--text-dim); flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .page-input { width: 55px; height: 26px; padding: 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.65rem; background: var(--bg); color: var(--text); outline: none; }
+        .toggle-btn { font-size: 0.55rem; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border); cursor: pointer; font-weight: 800; background: var(--card); color: var(--text); }
+        .btn-active { background: var(--active-green) !important; color: var(--active-green-text) !important; border-color: #86efac !important; }
+
+        /* MULTICOLOUR SPINNER & PROGRESS */
+        .loading-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.75); backdrop-filter: blur(10px); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; opacity: 0; transform: translateY(20px); transition: 0.3s ease; }
+        .loading-overlay.active { display: flex; opacity: 1; transform: translateY(0); }
+        
+        .spinner { width: 50px; height: 50px; border: 5px solid #eee; border-top: 5px solid transparent; border-radius: 50%; background: var(--brand-gradient); background-size: 200% 200%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff 0); animation: spin 1s linear infinite, borderRotate 3s linear infinite; }
+        .progress-bar { width: 220px; height: 6px; background: var(--border); border-radius: 10px; margin-top: 20px; overflow: hidden; position: relative; }
+        .progress-fill { width: 100%; height: 100%; background: var(--brand-gradient); background-size: 200% 200%; position: absolute; left: -100%; animation: progSlide 2s ease-in-out infinite, borderRotate 3s linear infinite; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes progSlide { 0% { left: -100%; } 50% { left: 0%; } 100% { left: 100%; } }
+
+        /* Standby Bouncing Dots */
+        .dot-loader { display: flex; gap: 8px; justify-content: center; }
+        .dot { width: 14px; height: 14px; border-radius: 50%; animation: bounce 0.6s infinite alternate; }
+        @keyframes bounce { to { transform: translateY(-15px); opacity: 0.3; } }
+
+        /* Toolbar Grouping */
+        #out-actions { display: none; align-items: center; gap: 10px; }
+        .glossy-wrap { position: relative; padding: 2px; border-radius: 8px; overflow: hidden; display: flex; align-items: center; }
+        .glossy-wrap::after { content: ''; position: absolute; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 20%, #4ade80, transparent 80%); animation: rotate 3s linear infinite; top: -50%; left: -50%; }
+        .save-btn { position: relative; z-index: 2; background: var(--green-glow); color: white; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; cursor: pointer; }
+        @keyframes rotate { to { transform: rotate(360deg); } }
+
+        #hover-popup { position: fixed; z-index: 9999; display: none; pointer-events: none; background: white; border: 1px solid #ddd; border-radius: 8px; width: 180px; height: 255px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .hover-page-tag { position: absolute; bottom: 8px; right: 8px; background: var(--primary); color: white; font-size: 0.55rem; padding: 2px 6px; border-radius: 4px; font-weight: 800; }
+
+        .preview-pane { flex-grow: 1; padding: 15px; display: flex; flex-direction: column; transition: 0.3s; position: relative; }
+        .preview-window { flex-grow: 1; background: var(--preview-bg); border-radius: 12px; border: 2px solid var(--border); position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    </style>
+</head>
+<body ondragover="handleDrag(event, true)" ondragleave="handleDrag(event, false)" ondrop="handleDrop(event)">
+
+<div id="hover-popup">
+    <canvas id="hover-canvas" style="width:100%; height:calc(100% - 25px); border-radius:8px 8px 0 0;"></canvas>
+    <div class="hover-page-tag" id="hover-pages">0 Pages</div>
+</div>
+<div id="toast-container" style="position:fixed; bottom:20px; right:20px; z-index:10000; display:flex; flex-direction:column; gap:8px;"></div>
+
+<div class="meta-bar">
+    <div class="brand-box">FileCraft Studio</div>
+    <div style="display: flex; gap: 20px; align-items: center; font-size: 0.75rem; font-weight: 600;">
+        <button onclick="toggleTheme()" style="background:none; border:none; cursor:pointer; font-size:1rem;">🌓</button>
+        <span id="current-date"></span>
+        <span id="current-time" style="font-family: 'JetBrains Mono'; color: var(--primary);"></span>
+        <span>© JP</span>
+    </div>
+</div>
+
+<div class="main-layout" id="app-container">
+    <div class="sidebar" id="sidebar">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:0.55rem; font-weight:800; color:var(--text-dim);">FILES: <span id="stat-count" style="color:var(--text)">0</span> | <span id="stat-size" style="color:var(--text)">0 KB</span></div>
+            <div id="sidebar-btns" style="display:none; gap:5px;">
+                <button id="prev-toggle" class="toggle-btn btn-active" onclick="togglePreviewState()">File Preview</button>
+                <button id="split-toggle" class="toggle-btn" onclick="toggleSplitMode()">Split</button>
+                <button class="toggle-btn" style="color:var(--danger)" onclick="clearSession()">Clear</button>
+            </div>
+        </div>
+
+        <div class="drop-zone-wrapper" id="dz-wrap" onclick="document.getElementById('file-input').click()">
+            <div class="drop-zone" id="dz">
+                <input type="file" id="file-input" multiple accept=".pdf" style="display:none;" onchange="handleFiles(this.files)">
+                <div style="font-size:1.4rem;">📁<span style="color:var(--primary);">+</span></div>
+                <div style="font-size:0.6rem; font-weight:800; letter-spacing:1px;">ADD PDF FILES</div>
+            </div>
+        </div>
+
+        <input type="text" id="search-bar" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:8px; font-size:0.7rem; display:none; background:var(--card); color:var(--text);" placeholder="Quick search..." oninput="filterFiles(this.value)">
+        <div id="file-list" style="flex-grow:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <div class="collapse-trigger" id="col-btn" onclick="toggleSidebar()"> ❮ </div>
+
+    <div class="preview-pane">
+        <div class="loading-overlay" id="loading">
+            <div class="spinner"></div>
+            <div class="progress-bar"><div class="progress-fill"></div></div>
+            <div style="font-weight:800; font-size:0.7rem; color:var(--primary); margin-top:15px; letter-spacing:1px;">CRAFTING DOCUMENT...</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span style="font-size: 0.6rem; font-weight: 800; color: var(--text-dim);">OUTPUT PREVIEW</span>
+            <div id="out-actions">
+                <button onclick="toggleFullScreen()" style="background:transparent; border:1px solid var(--border); padding:5px 10px; border-radius:6px; font-size:0.9rem; cursor:pointer; color:var(--text);" title="Full Screen View">⛶</button>
+                <div class="glossy-wrap"><button class="save-btn" onclick="downloadPDF()">Save Merged File</button></div>
+            </div>
+        </div>
+
+        <div class="preview-window">
+            <div id="placeholder" style="text-align:center;">
+                <div class="dot-loader">
+                    <div class="dot" style="background:#6366f1;"></div>
+                    <div class="dot" style="background:#22c55e; animation-delay:0.2s"></div>
+                    <div class="dot" style="background:#ec4899; animation-delay:0.4s"></div>
+                </div>
+                <div style="font-weight:800; font-size:0.9rem; margin-top:20px;">Ready to Craft</div>
+            </div>
+            <iframe id="pdf-view" style="display:none; width:100%; height:100%; border:none;"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    let filesArray = [];
+    let splitMode = false;
+    let previewEnabled = true;
+
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.setAttribute('data-theme', 'dark');
+    setInterval(() => {
+        const n = new Date();
+        document.getElementById('current-date').innerText = n.toLocaleDateString('en-GB').replace(/\//g, '-');
+        document.getElementById('current-time').innerText = n.toLocaleTimeString('en-GB', { hour12: false });
+    }, 1000);
+
+    function handleDrag(e, active) { 
+        e.preventDefault(); 
+        document.getElementById('dz-wrap').classList.toggle('drag-active', active); 
+    }
+    
+    function handleDrop(e) { 
+        e.preventDefault(); 
+        document.getElementById('dz-wrap').classList.remove('drag-active'); 
+        handleFiles(e.dataTransfer.files); 
+    }
+
+    async function handleFiles(files) {
+        if(!files.length) return;
+        document.getElementById('search-bar').value = '';
+        let added = 0;
+        for (let file of files) {
+            if (file.type !== 'application/pdf') continue;
+            const data = await file.arrayBuffer();
+            const pdfDoc = await pdfjsLib.getDocument({data}).promise;
+            const fObj = { id: Math.random().toString(36).substr(2,9), data: file, name: file.name, size: file.size, pages: '', totalPages: pdfDoc.numPages };
+            filesArray.push(fObj);
+            renderCard(fObj);
+            added++;
+        }
+        if(added > 0) {
+            ['sidebar-btns','search-bar','out-actions','col-btn'].forEach(id => document.getElementById(id).style.display = 'flex');
+            updateStats(); generatePreview();
+            showToast(`Studio: ${added} files imported.`);
+        }
+    }
+
+    function renderCard(f) {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        card.dataset.id = f.id;
+        card.innerHTML = `
+            <span style="color:var(--text-dim); cursor:grab">⠿</span>
+            <span class="file-name">${f.name}</span>
+            <input type="text" class="page-input" placeholder="1-5" style="display:${splitMode?'block':'none'}" 
+                   onchange="updatePages('${f.id}', this.value)" onmouseenter="window.pLock=true" onmouseleave="window.pLock=false">
+            <button onclick="removeFile('${f.id}')" onmouseenter="window.pLock=true" onmouseleave="window.pLock=false"
+                    style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:800;">✕</button>
+        `;
+        card.onmouseenter = (e) => { if(previewEnabled && !window.pLock) showHover(f, e); };
+        card.onmousemove = (e) => {
+            const pop = document.getElementById('hover-popup');
+            pop.style.left = (e.clientX + 20) + 'px'; pop.style.top = (e.clientY - 120) + 'px';
+        };
+        card.onmouseleave = () => document.getElementById('hover-popup').style.display = 'none';
+        document.getElementById('file-list').appendChild(card);
+    }
+
+    async function showHover(f, e) {
+        const pop = document.getElementById('hover-popup');
+        pop.style.display = 'block';
+        document.getElementById('hover-pages').innerText = `${f.totalPages} Pages`;
+        const data = await f.data.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data}).promise;
+        const page = await pdf.getPage(1);
+        const canvas = document.getElementById('hover-canvas');
+        const viewport = page.getViewport({scale: 0.4});
+        canvas.height = viewport.height; canvas.width = viewport.width;
+        await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    }
+
+    async function generatePreview() {
+        if(!filesArray.length) return;
+        const loading = document.getElementById('loading');
+        loading.classList.add('active');
+        
+        const mergedPdf = await PDFLib.PDFDocument.create();
+        for (let f of filesArray) {
+            const bytes = await f.data.arrayBuffer();
+            const doc = await PDFLib.PDFDocument.load(bytes);
+            const indices = f.pages.trim() ? parsePages(f.pages, doc.getPageCount()) : doc.getPageIndices();
+            const pgs = await mergedPdf.copyPages(doc, indices);
+            pgs.forEach(p => mergedPdf.addPage(p));
+        }
+        
+        const blob = new Blob([await mergedPdf.save()], { type: 'application/pdf' });
+        document.getElementById('pdf-view').src = URL.createObjectURL(blob);
+        window.currentBlob = blob;
+        
+        setTimeout(() => {
+            loading.classList.remove('active');
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('pdf-view').style.display = 'block';
+        }, 1200);
+    }
+
+    function togglePreviewState() { previewEnabled = !previewEnabled; document.getElementById('prev-toggle').classList.toggle('btn-active', previewEnabled); }
+    function toggleSplitMode() { splitMode = !splitMode; document.getElementById('split-toggle').classList.toggle('btn-active', splitMode); document.querySelectorAll('.page-input').forEach(i => i.style.display = splitMode ? 'block' : 'none'); }
+    function toggleSidebar() { const sb = document.getElementById('sidebar'); sb.classList.toggle('collapsed'); document.getElementById('col-btn').innerText = sb.classList.contains('collapsed') ? '❯' : '❮'; }
+    function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+    function updateStats() { const s = filesArray.reduce((a, b) => a + b.size, 0); document.getElementById('stat-count').innerText = filesArray.length; document.getElementById('stat-size').innerText = (s / 1024).toFixed(0) + " KB"; }
+    function removeFile(id) { filesArray = filesArray.filter(f => f.id !== id); document.getElementById('file-list').innerHTML = ''; filesArray.forEach(f => renderCard(f)); updateStats(); generatePreview(); if(!filesArray.length) clearSession(); }
+    function clearSession() { filesArray = []; document.getElementById('file-list').innerHTML = ''; ['sidebar-btns','search-bar','out-actions','col-btn'].forEach(id => document.getElementById(id).style.display = 'none'); document.getElementById('pdf-view').style.display = 'none'; document.getElementById('placeholder').style.display = 'block'; updateStats(); showToast("Studio: Workspace cleared."); }
+    function downloadPDF() { const a = document.createElement('a'); a.href = URL.createObjectURL(window.currentBlob); a.download = `Merged_Crafed_${Date.now()}.pdf`; a.click(); }
+    function showToast(m) { const t = document.createElement('div'); t.className = 'toast'; t.innerText = m; t.style.cssText = "background:var(--toast-bg); padding:12px 20px; border-radius:8px; font-size:0.7rem; font-weight:700; border-left:4px solid var(--primary); box-shadow:0 4px 15px rgba(0,0,0,0.1);"; document.getElementById('toast-container').appendChild(t); setTimeout(() => t.remove(), 4000); }
+    function filterFiles(q) { const query = q.toLowerCase(); document.querySelectorAll('.file-card').forEach(c => { c.style.display = c.innerText.toLowerCase().includes(query) ? 'flex' : 'none'; }); }
+    function parsePages(s, m) { const r = []; s.split(',').forEach(p => { if(p.includes('-')){ const [st, en] = p.split('-').map(n => parseInt(n.trim()) - 1); for(let i=st; i<=en && i<m; i++) if(i>=0) r.push(i); } else { const n = parseInt(p.trim()) - 1; if(n>=0 && n<m) r.push(n); } }); return r.length ? r : Array.from({length:m}, (_,i)=>i); }
+    function updatePages(id, val) { filesArray.find(x => x.id === id).pages = val; generatePreview(); }
+    function toggleTheme() { const b = document.body; b.setAttribute('data-theme', b.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
+
+    new Sortable(document.getElementById('file-list'), { animation: 150, handle: 'span', onEnd: () => {
+        const ids = Array.from(document.getElementById('file-list').children).map(c => c.dataset.id);
+        filesArray = ids.map(id => filesArray.find(f => f.id === id));
+        generatePreview();
+    }});
+</script>
+</body>
+</html>
