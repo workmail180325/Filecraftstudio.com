@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileCraft Studio | JP</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --bg: #ffffff;
+            --sidebar-bg: #f8fafc;
+            --text: #0f172a;
+            --text-dim: #64748b;
+            --border: #e2e8f0;
+            --preview-bg: #f1f5f9;
+            --card: #ffffff;
+            --green-glow: #10b981;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --sidebar-bg: #020617;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: #1e293b;
+            --preview-bg: #020617;
+            --card: #1e293b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Meta Header --- */
+        .meta-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 25px;
+            background: #ffffff;
+            color: #000000;
+            font-weight: 800;
+            border-bottom: 2px solid #f1f5f9;
+            font-size: 0.8rem;
+            z-index: 1000;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 15px 20px;
+            gap: 12px;
+            height: 100%;
+            overflow: hidden; /* Prevents sidebar itself from scrolling */
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* --- Shared Box Aesthetic --- */
+        .box-style {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            width: 100%;
+        }
+
+        .drop-zone {
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* --- MANDATORY SCROLL BOX --- */
+        .file-scroll-box {
+            flex-grow: 1; /* Takes up all remaining sidebar space */
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Clips the internal scroll */
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        #file-list {
+            overflow-y: scroll; /* FORCED VERTICAL SCROLL */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 8px; /* Space for scrollbar */
+        }
+
+        /* Custom Scrollbar Styling */
+        #file-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        #file-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #file-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        #file-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .file-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.75rem;
+            cursor: grab;
+            flex-shrink: 0; /* Prevents cards from squishing */
+        }
+
+        /* --- Preview Area --- */
+        .preview-pane {
+            padding: 15px 25px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            min-height: 40px;
+        }
+
+        .header-actions {
+            display: none;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .merge-status {
+            color: #10b981;
+            font-weight: 800;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .btn-outer {
+            position: relative;
+            padding: 2px;
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .btn-outer::before {
+            content: '';
+            position: absolute;
+            width: 200%; height: 200%;
+            background: conic-gradient(transparent, transparent, transparent, var(--green-glow));
+            animation: rotate 2.5s linear infinite;
+            top: -50%; left: -50%;
+        }
+
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+
+        .save-btn {
+            position: relative;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 0.75rem;
+            cursor: pointer;
+            z-index: 2;
+            text-transform: uppercase;
+        }
+
+        .preview-window {
+            flex: 1;
+            background: var(--preview-bg);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div class="meta-bar">
+        <div>FILES: <span id="stat-count">0</span> | SIZE: <span id="stat-size">0 KB</span></div>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <span id="current-date">--/--/--</span>
+            <span id="current-time">--:--:--</span>
+            <span style="color: var(--primary); font-family: 'JetBrains Mono'; font-size: 0.85rem; font-weight: 800;">© JP</span>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2 style="letter-spacing: -1px; font-weight: 800; font-size: 1.3rem;">FileCraft <span style="color: var(--primary)">Studio</span></h2>
+                <button onclick="toggleTheme()" style="background:var(--card); border:1px solid var(--border); padding:4px 8px; border-radius:6px; cursor:pointer; font-size: 0.7rem;">🌓</button>
+            </div>
+
+            <div class="box-style drop-zone" id="drop-zone">
+                <input type="file" id="file-input" multiple accept=".pdf" style="display: none;">
+                <div style="font-size: 1.1rem;">➕</div>
+                <strong style="font-size: 0.65rem; margin-top: 4px;">ADD PDF FILES</strong>
+            </div>
+
+            <div class="box-style file-scroll-box">
+                <div id="file-list">
+                    </div>
+            </div>
+        </div>
+
+        <div class="preview-pane">
+            <div class="preview-header">
+                <h4 style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 1px; font-weight: 800;">Final Output Review</h4>
+                
+                <div class="header-actions" id="action-group">
+                    <div class="merge-status">✅ Merge Complete</div>
+                    <div class="btn-outer">
+                        <button class="save-btn" id="merge-btn">Save Merged File</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-window" id="preview-window">
+                <div id="placeholder" style="color: var(--text-dim); font-weight: 600; font-size: 0.7rem;">PREVIEW STANDBY</div>
+                <iframe id="output-view" style="display: none;"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const fileListContainer = document.getElementById('file-list');
+        const previewWindow = document.getElementById('preview-window');
+        const outputView = document.getElementById('output-view');
+        const placeholder = document.getElementById('placeholder');
+        const actionGroup = document.getElementById('action-group');
+
+        let filesArray = [];
+
+        new Sortable(fileListContainer, {
+            animation: 150,
+            onEnd: function() {
+                const newOrder = Array.from(fileListContainer.children).map(card => card.dataset.id);
+                filesArray = newOrder.map(id => filesArray.find(f => f.id === id));
+                generateSilentPreview(); 
+            }
+        });
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').innerText = now.toLocaleTimeString();
+            document.getElementById('current-date').innerText = now.toLocaleDateString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function toggleTheme() {
+            document.body.setAttribute('data-theme', document.body.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFiles(e.target.files);
+                e.target.value = '';
+            }
+        });
+
+        document.addEventListener('dragover', e => e.preventDefault());
+        document.addEventListener('drop', e => e.preventDefault());
+        dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+
+        function handleFiles(files) {
+            actionGroup.style.display = 'none';
+            for (let file of files) {
+                if (file.type === 'application/pdf') {
+                    filesArray.push({ id: Math.random().toString(36).substr(2, 9), data: file });
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            renderFiles();
+            const totalSize = filesArray.reduce((acc, f) => acc + f.data.size, 0);
+            document.getElementById('stat-count').innerText = filesArray.length;
+            document.getElementById('stat-size').innerText = (totalSize / 1024).toFixed(0) + " KB";
+            generateSilentPreview();
+        }
+
+        function renderFiles() {
+            fileListContainer.innerHTML = '';
+            filesArray.forEach((fileObj) => {
+                const card = document.createElement('div');
+                card.className = 'file-card';
+                card.dataset.id = fileObj.id;
+                card.innerHTML = `
+                    <span style="color: var(--primary); font-size:1rem; cursor:grab;">⠿</span>
+                    <span style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${fileObj.data.name}</span>
+                    <button onclick="removeFile('${fileObj.id}')" style="background:none; border:none; color:#f87171; cursor:pointer; font-weight:bold; padding:0 5px;">✕</button>
+                `;
+                fileListContainer.appendChild(card);
+            });
+        }
+
+        window.removeFile = (id) => {
+            actionGroup.style.display = 'none';
+            filesArray = filesArray.filter(f => f.id !== id);
+            updateUI();
+        };
+
+        async function generateSilentPreview() {
+            if (filesArray.length === 0) {
+                outputView.style.display = 'none';
+                placeholder.style.display = 'block';
+                actionGroup.style.display = 'none';
+                return;
+            }
+
+            try {
+                const mergedPdf = await PDFLib.PDFDocument.create();
+                for (const f of filesArray) {
+                    const bytes = await f.data.arrayBuffer();
+                    const pdf = await PDFLib.PDFDocument.load(bytes);
+                    const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    pages.forEach(p => mergedPdf.addPage(p));
+                }
+                const pdfBytes = await mergedPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                outputView.src = URL.createObjectURL(blob);
+                outputView.style.display = 'block';
+                placeholder.style.display = 'none';
+                actionGroup.style.display = 'flex';
+                window.currentMergedBlob = blob;
+            } catch (e) { 
+                actionGroup.style.display = 'none';
+            }
+        }
+
+        document.getElementById('merge-btn').addEventListener('click', () => {
+            if (window.currentMergedBlob) {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(window.currentMergedBlob);
+                link.download = "FileCraft_Merged.pdf";
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
